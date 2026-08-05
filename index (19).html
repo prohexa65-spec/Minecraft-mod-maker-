@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Create Minecraft Bedrock addons directly in your browser.">
+    <title>Minecraft Bedrock Addon Creator</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #111714;
+            --panel: #1a2420;
+            --panel-light: #22302a;
+            --border: #34453d;
+            --text: #edf5f0;
+            --muted: #9eafa5;
+            --green: #55c878;
+            --green-dark: #2f8f50;
+            --danger: #ef7777;
+            --warning: #e8bd68;
+            --shadow: 0 18px 45px rgba(0, .28);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background:
+                radial-gradient(circle at top right, rgba(50, 117, 76, .2), transparent 35%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .app-shell {
+            width: min(1240px, calc(100% - 32px));
+            margin: 32px auto;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            display: grid;
+            place-items: center;
+            width: 48px;
+            height: 48px;
+            border: 1px solid #5ed17d;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #316d42, #193925);
+            box-shadow: 0 8px 22px rgba(39, 133, 74, .28);
+            font-size: 25px;
+        }
+
+        h1, h2, p { margin-top: 0; }
+        h1 {
+            margin-bottom: 4px;
+            font-size: clamp(1.45rem, 3vw, 2.1rem);
+        }
+
+        .subtitle, .hint { color: var(--muted); }
+        .subtitle { margin-bottom: 0; font-size: .92rem; }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: rgba(26, 36, 32, .94);
+            box-shadow: var(--shadow);
+        }
+
+        .form-card {
+            padding: 22px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            padding-bottom: 13px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-title h2, .editor-header h2 {
+            margin: 0;
+            font-size: 1.05rem;
+        }
+
+        .section-number {
+            display: grid;
+            place-items: center;
+            width: 25px;
+            height: 25px;
+            border-radius: 7px;
+            background: var(--green-dark);
+            color: white;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .field.full { grid-column: 1 / -1; }
+
+        label {
+            color: #d8e7de;
+            font-size: .86rem;
+            font-weight: 650;
+        }
+
+        input, select {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            outline: none;
+            padding: 11px 12px;
+            background: #111a16;
+            color: var(--text);
+            font: inherit;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(85, 200, 120, .14);
+        }
+
+        input[type="file"] { padding: 8px; cursor: pointer; }
+
+        .upload-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .preview {
+            display: none;
+            width: 62px;
+            height: 62px;
+            object-fit: cover;
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            image-rendering: pixelated;
+        }
+
+        .editor-card {
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .editor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 15px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .file-label {
+            color: var(--muted);
+            font-family: monospace;
+            font-size: .82rem;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 245px minmax(0, 1fr);
+            min-height: 440px;
+        }
+
+        .explorer {
+            border-right: 1px solid var(--border);
+            background: #141d19;
+        }
+
+        .explorer-toolbar {
+            display: flex;
+            gap: 6px;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .explorer-toolbar button {
+            flex: 1;
+            padding: 8px 6px;
+            font-size: .76rem;
+        }
+
+        .file-list {
+            max-height: 500px;
+            overflow: auto;
+            padding: 8px 0;
+        }
+
+        .tree-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            width: 100%;
+            border: 0;
+            border-radius: 0;
+            padding: 8px 10px;
+            background: transparent;
+            color: var(--text);
+            text-align: left;
+            font-size: .82rem;
+            font-weight: 500;
+            transform: none;
+        }
+
+        .tree-row:hover {
+            background: var(--panel-light);
+            transform: none;
+        }
+
+        .tree-row.active {
+            background: rgba(85, 200, 120, .18);
+            color: var(--green);
+        }
+
+        .tree-row.directory {
+            color: var(--muted);
+            cursor: default;
+        }
+
+        .tree-actions {
+            display: none;
+            margin-left: auto;
+            gap: 4px;
+        }
+
+        .tree-row:hover .tree-actions { display: flex; }
+
+        .tree-actions button {
+            padding: 1px 5px;
+            background: transparent;
+            color: var(--muted);
+            font-size: .8rem;
+        }
+
+        .tree-actions button:hover {
+            color: var(--danger);
+            transform: none;
+        }
+
+        #editor {
+            min-height: 400px;
+            height: 52vh;
+            width: 100%;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 9px;
+            padding: 12px 19px;
+            background: linear-gradient(135deg, #5dd17c, #329753);
+            color: #07150c;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 750;
+            transition: transform .2s, filter .2s;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: .65;
+            transform: none;
+        }
+
+        .secondary {
+            background: var(--panel-light);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .status {
+            min-height: 22px;
+            color: var(--muted);
+            font-size: .9rem;
+        }
+
+        .status.success { color: var(--green); }
+        .status.error { color: var(--danger); }
+        .hint { margin: 8px 0 0; font-size: .78rem; }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            display: none;
+            place-items: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, .65);
+            z-index: 20;
+        }
+
+        .modal-backdrop.open { display: grid; }
+
+        .modal {
+            width: min(520px, 100%);
+            padding: 22px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .modal h2 { margin-bottom: 16px; }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        @media (max-width: 760px) {
+            .app-shell {
+                width: min(100% - 20px, 1240px);
+                margin: 20px auto;
+            }
+
+            .form-grid { grid-template-columns: 1fr; }
+            .field.full { grid-column: auto; }
+            .form-card { padding: 16px; }
+
+            .workspace { grid-template-columns: 1fr; }
+            .explorer {
+                border-right: 0;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .file-list {
+                display: flex;
+                flex-wrap: wrap;
+                max-height: 180px;
+            }
+
+            .tree-row { width: auto; }
+            #editor { height: 58vh; }
+        }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <header>
+        <div class="brand">
+            <div class="brand-icon" aria-hidden="true">⛏</div>
+            <div>
+                <h1>Minecraft Bedrock Addon Creator</h1>
+                <p class="subtitle">Build and download JavaScript addons entirely in your browser.</p>
+            </div>
+        </div>
+    </header>
+
+    <section class="card form-card">
+        <div class="section-title">
+            <span class="section-number">1</span>
+            <h2>Addon Details</h2>
+        </div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label for="addonName">Addon Name</label>
+                <input id="addonName" type="text" value="My Custom Addon">
+            </div>
+
+            <div class="field">
+                <label for="addonVersion">Addon Version</label>
+                <input id="addonVersion" type="text" value="1.0.0">
+            </div>
+
+            <div class="field full">
+                <label for="addonDescription">Addon Description</label>
+                <input id="addonDescription" type="text" value="Created with Minecraft Bedrock Web Creator">
+            </div>
+
+            <div class="field">
+                <label for="engineVersion">Minimum Engine Version</label>
+                <select id="engineVersion">
+                    <option value="1.21.0">1.21.0</option>
+                    <option value="1.20.80">1.20.80</option>
+                    <option value="1.20.0">1.20.0</option>
+                    <option value="1.19.80">1.19.80</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="scriptVersion">Script Module Version</label>
+                <select id="scriptVersion">
+                    <option value="1.14.0">1.14.0</option>
+                    <option value="1.13.0">1.13.0</option>
+                    <option value="1.12.0">1.12.0</option>
+                    <option value="1.10.0">1.10.0</option>
+                </select>
+            </div>
+
+            <div class="field full">
+                <label>
+                    <input id="serverUiDependency" type="checkbox">
+                    Include @minecraft/server-ui dependency
+                </label>
+            </div>
+
+            <div class="field full">
+                <label for="iconUpload">Cover Art / Pack Icon</label>
+                <div class="upload-row">
+                    <input id="iconUpload" type="file" accept="image/png">
+                    <img id="iconPreview" class="preview" alt="Pack icon preview">
+                </div>
+                <p class="hint">PNG files only. A generated icon is used when no image is selected.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="card editor-card">
+        <div class="editor-header">
+            <h2>2. Project Files</h2>
+            <span id="activeFileLabel" class="file-label">scripts/main.js</span>
+        </div>
+
+        <div class="workspace">
+            <aside class="explorer" aria-label="Project file explorer">
+                <div class="explorer-toolbar">
+                    <button id="newFileButton" type="button">＋ File</button>
+                    <button id="newDirectoryButton" type="button">＋ Folder</button>
+                    <button id="presetButton" type="button">＋ Preset</button>
+                </div>
+                <div id="fileList" class="file-list"></div>
+            </aside>
+            <div id="editor" aria-label="Code editor"></div>
+        </div>
+    </section>
+
+    <div class="actions">
+        <div id="status" class="status" role="status"></div>
+        <button id="downloadButton" type="button">⬇ Generate .mcaddon</button>
+    </div>
+</main>
+
+<div id="presetModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+        <h2>Add Preset JSON</h2>
+        <label for="presetSelect">Template</label>
+        <select id="presetSelect">
+            <option value="entity">Custom Entity — entities/entity_template.json</option>
+            <option value="item">Custom Item — items/item_template.json</option>
+            <option value="block">Custom Block — blocks/block_template.json</option>
+            <option value="recipe">Recipe — recipes/recipe_template.json</option>
+            <option value="loot">Loot Table — loot_tables/loot_template.json</option>
+        </select>
+        <div class="modal-actions">
+            <button id="cancelPresetButton" class="secondary" type="button">Cancel</button>
+            <button id="addPresetButton" type="button">Add Template</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let editor;
+    let activePath = "scripts/main.js";
+    const models = new Map();
+    const directories = new Set();
+
+    const files = {
+        "manifest.json": "",
+        "scripts/main.js": `import { world, system } from "@minecraft/server";
+
+world.afterEvents.playerSpawn.subscribe((event) => {
+    event.player.sendMessage("§aWelcome to your custom addon!");
+});
+
+system.runInterval(() => {
+    for (const player of world.getAllPlayers()) {
+        player.onScreenDisplay.setActionBar("§2Custom Addon Active");
+    }
+}, 100);`
+    };
+
+    const $ = id => document.getElementById(id);
+    const statusElement = $("status");
+
+    const templates = {
+        entity: {
+            path: "entities/entity_template.json",
+            data: {
+                format_version: "1.21.0",
+                "minecraft:entity": {
+                    description: {
+                        identifier: "creator:custom_entity",
+                        is_spawnable: true,
+                        is_summonable: true,
+                        is_experimental: false
+                    },
+                    components: {
+                        "minecraft:type_family": { family: ["custom_entity", "mob"] },
+                        "minecraft:health": { value: 20, max: 20 },
+                        "minecraft:collision_box": { width: 0.6, height: 1.8 },
+                        "minecraft:movement": { value: 0.25 },
+                        "minecraft:physics": {},
+                        "minecraft:nameable": {}
+                    }
+                }
+            }
+        },
+        item: {
+            path: "items/item_template.json",
+            data: {
+                format_version: "1.21.0",
+                "minecraft:item": {
+                    description: {
+                        identifier: "creator:custom_item",
+                        menu_category: { category: "items" }
+                    },
+                    components: {
+                        "minecraft:max_stack_size": 64,
+                        "minecraft:icon": { texture: "custom_item" },
+                        "minecraft:display_name": { value: "Custom Item" }
+                    }
+                }
+            }
+        },
+        block: {
+            path: "blocks/block_template.json",
+            data: {
+                format_version: "1.21.0",
+                "minecraft:block": {
+                    description: {
+                        identifier: "creator:custom_block",
+                        states: {},
+                        menu_category: { category: "construction" }
+                    },
+                    components: {
+                        "minecraft:destroy_time": 1,
+                        "minecraft:friction": 0.6,
+                        "minecraft:map_color": "#5c6ac4",
+                        "minecraft:geometry": "geometry.full_block"
+                    }
+                }
+            }
+        },
+        recipe: {
+            path: "recipes/recipe_template.json",
+            data: {
+                format_version: "1.20.10",
+                "minecraft:recipe_shaped": {
+                    description: { identifier: "creator:custom_recipe" },
+                    tags: ["crafting_table"],
+                    pattern: ["AA", "AA"],
+                    key: { A: { item: "minecraft:diamond" } },
+                    result: { item: "minecraft:emerald", count: 1 }
+                }
+            }
+        },
+        loot: {
+            path: "loot_tables/loot_template.json",
+            data: {
+                pools: [{
+                    rolls: 1,
+                    entries: [{
+                        type: "item",
+                        name: "minecraft:diamond",
+                        weight: 1
+                    }]
+                }]
+            }
+        }
+    };
+
+    function createUuid() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === "x" ? r : (r & 3 | 8)).toString(16);
+        });
+    }
+
+    function parseVersion(value) {
+        const match = String(value).trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+        return match ? match.slice(1).map(Number) : null;
+    }
+
+    function safeFilename(value) {
+        return String(value || "custom-addon")
+            .trim()
+            .replace(/[^a-z0-9-_]+/gi, "-")
+            .replace(/^-+|-+$/g, "")
+            .toLowerCase() || "custom-addon";
+    }
+
+    function showStatus(message, error = false) {
+        statusElement.textContent = message;
+        statusElement.className = `status ${error ? "error" : "success"}`;
+    }
+
+    function languageFor(path) {
+        return path.endsWith(".json") ? "json" : "javascript";
+    }
+
+    function isValidPath(path) {
+        return /^(?!\/)(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.(json|js)$/.test(path);
+    }
+
+    function syncManifest() {
+        const version = parseVersion($("addonVersion").value) || [1, 0, 0];
+        const dependencies = [{
+            module_name: "@minecraft/server",
+            version: $("scriptVersion").value
+        }];
+
+        if ($("serverUiDependency").checked) {
+            dependencies.push({
+                module_name: "@minecraft/server-ui",
+                version: $("scriptVersion").value
+            });
+        }
+
+        const manifest = {
+            format_version: 2,
+            header: {
+                name: $("addonName").value.trim() || "My Custom Addon",
+                description: $("addonDescription").value.trim() || "Created with Minecraft Bedrock Web Creator",
+                uuid: window.manifestHeaderUuid || (window.manifestHeaderUuid = createUuid()),
+                version,
+                min_engine_version: $("engineVersion").value.split(".").map(Number)
+            },
+            modules: [
+                {
+                    description: $("addonDescription").value.trim(),
+                    type: "data",
+                    uuid: window.dataModuleUuid || (window.dataModuleUuid = createUuid()),
+                    version
+                },
+                {
+                    description: `${$("addonName").value.trim() || "Custom Addon"} JavaScript`,
+                    type: "script",
+                    language: "javascript",
+                    uuid: window.scriptModuleUuid || (window.scriptModuleUuid = createUuid()),
+                    version,
+                    entry: "scripts/main.js"
+                }
+            ],
+            dependencies
+        };
+
+        files["manifest.json"] = JSON.stringify(manifest, null, 2);
+
+        if (editor && activePath === "manifest.json") {
+            const model = models.get("manifest.json");
+            if (model && model.getValue() !== files["manifest.json"]) {
+                model.setValue(files["manifest.json"]);
+            }
+        }
+    }
+
+    function createModel(path) {
+        if (models.has(path)) return models.get(path);
+
+        const uri = monaco.Uri.parse(`inmemory://minecraft-addon/${encodeURIComponent(path)}`);
+        const model = monaco.editor.createModel(files[path] || "", languageFor(path), uri);
+
+        model.onDidChangeContent(() => {
+            files[path] = model.getValue();
+            if (path === "manifest.json") refreshExplorer();
+        });
+
+        models.set(path, model);
+        return model;
+    }
+
+    function openFile(path) {
+        if (!files[path] || !editor) return;
+        activePath = path;
+        editor.setModel(createModel(path));
+        $("activeFileLabel").textContent = path;
+        refreshExplorer();
+    }
+
+    function allDirectories() {
+        const result = new Set(directories);
+        Object.keys(files).forEach(path => {
+            const parts = path.split("/");
+            parts.pop();
+            for (let i = 1; i <= parts.length; i++) {
+                result.add(parts.slice(0, i).join("/"));
+            }
+        });
+        return [...result].sort();
+    }
+
+    function refreshExplorer() {
+        const list = $("fileList");
+        list.innerHTML = "";
+
+        allDirectories().forEach(directory => {
+            const row = document.createElement("div");
+            row.className = "tree-row directory";
+            row.style.paddingLeft = `${10 + directory.split("/").length * 12}px`;
+            row.textContent = `📁 ${directory.split("/").pop()}`;
+            list.appendChild(row);
+        });
+
+        Object.keys(files).sort().forEach(path => {
+            const row = document.createElement("div");
+            row.className = `tree-row ${path === activePath ? "active" : ""}`;
+            row.style.paddingLeft = `${10 + path.split("/").length * 12}px`;
+
+            const icon = path.endsWith(".json") ? "▣" : "JS";
+            const label = document.createElement("span");
+            label.textContent = `${icon} ${path.split("/").pop()}`;
+            row.appendChild(label);
+
+            if (path !== "manifest.json" && path !== "scripts/main.js") {
+                const actions = document.createElement("span");
+                actions.className = "tree-actions";
+
+                const rename = document.createElement("button");
+                rename.type = "button";
+                rename.textContent = "✎";
+                rename.title = "Rename file";
+                rename.onclick = event => {
+                    event.stopPropagation();
+                    renameFile(path);
+                };
+
+                const remove = document.createElement("button");
+                remove.type = "button";
+                remove.textContent = "×";
+                remove.title = "Delete file";
+                remove.onclick = event => {
+                    event.stopPropagation();
+                    deleteFile(path);
+                };
+
+                actions.append(rename, remove);
+                row.appendChild(actions);
+            }
+
+            row.onclick = () => openFile(path);
+            list.appendChild(row);
+        });
+    }
+
+    function addFile(path, content = "") {
+        path = path.trim().replace(/^\/+|\/+$/g, "");
+
+        if (!isValidPath(path)) {
+            showStatus("Files must have a .json or .js extension and use a valid relative path.", true);
+            return;
+        }
+
+        if (files[path]) {
+            showStatus(`The file "${path}" already exists.`, true);
+            return;
+        }
+
+        files[path] = content;
+        openFile(path);
+        showStatus(`Added ${path}.`);
+    }
+
+    function renameFile(oldPath) {
+        const nextPath = prompt("Enter the new relative file path:", oldPath);
+        if (!nextPath || nextPath === oldPath) return;
+
+        if (!isValidPath(nextPath) || files[nextPath]) {
+            showStatus("Invalid path or a file with that name already exists.", true);
+            return;
+        }
+
+        files[nextPath] = files[oldPath];
+        delete files[oldPath];
+
+        const model = models.get(oldPath);
+        if (model) {
+            models.delete(oldPath);
+            model.dispose();
+        }
+
+        if (activePath === oldPath) openFile(nextPath);
+        else refreshExplorer();
+
+        showStatus(`Renamed file to ${nextPath}.`);
+    }
+
+    function deleteFile(path) {
+        if (!confirm(`Delete "${path}"?`)) return;
+
+        delete files[path];
+
+        const model = models.get(path);
+        if (model) {
+            models.delete(path);
+            model.dispose();
+        }
+
+        if (activePath === path) openFile("scripts/main.js");
+        else refreshExplorer();
+
+        showStatus(`Deleted ${path}.`);
+    }
+
+    function addDirectory() {
+        const path = prompt("Enter a directory path, for example entities:");
+        if (!path) return;
+
+        const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
+        if (!/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(cleanPath)) {
+            showStatus("Enter a valid relative directory path.", true);
+            return;
+        }
+
+        directories.add(cleanPath);
+        refreshExplorer();
+        showStatus(`Added directory ${cleanPath}.`);
+    }
+
+    function createFallbackIcon() {
+        return new Promise(resolve => {
+            const canvas = document.createElement("canvas");
+            canvas.width = canvas.height = 256;
+            const context = canvas.getContext("2d");
+
+            context.fillStyle = "#26352d";
+            context.fillRect(0, 0, 256, 256);
+            context.fillStyle = "#4a7c45";
+            context.fillRect(0, 0, 256, 130);
+            context.fillStyle = "#386334";
+            context.fillRect(0, 130, 256, 126);
+            context.fillStyle = "#6da84d";
+            context.fillRect(24, 34, 208, 34);
+            context.fillStyle = "#151d18";
+            context.fillRect(68, 145, 34, 34);
+            context.fillRect(154, 145, 34, 34);
+            context.fillRect(92, 198, 72, 18);
+
+            canvas.toBlob(resolve, "image/png");
+        });
+    }
+
+    $("newFileButton").onclick = () => {
+        const path = prompt("Enter a file path, for example entities/custom_entity.json:");
+        if (path) addFile(path);
+    };
+
+    $("newDirectoryButton").onclick = addDirectory;
+
+    $("presetButton").onclick = () => $("presetModal").classList.add("open");
+    $("cancelPresetButton").onclick = () => $("presetModal").classList.remove("open");
+
+    $("addPresetButton").onclick = () => {
+        const template = templates[$("presetSelect").value];
+        addFile(template.path, JSON.stringify(template.data, null, 2));
+        $("presetModal").classList.remove("open");
+    };
+
+    document.querySelectorAll("input, select").forEach(element => {
+        element.addEventListener("input", syncManifest);
+        element.addEventListener("change", syncManifest);
+    });
+
+    $("iconUpload").addEventListener("change", () => {
+        const file = $("iconUpload").files[0];
+
+        if (!file) {
+            $("iconPreview").style.display = "none";
+            return;
+        }
+
+        if (file.type !== "image/png") {
+            $("iconUpload").value = "";
+            $("iconPreview").style.display = "none";
+            showStatus("Please select a PNG image.", true);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = event => {
+            $("iconPreview").src = event.target.result;
+            $("iconPreview").style.display = "block";
+        };
+        reader.readAsDataURL(file);
+    });
+
+    require.config({
+        paths: {
+            vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs"
+        }
+    });
+
+    require(["vs/editor/editor.main"], () => {
+        editor = monaco.editor.create($("editor"), {
+            model: createModel(activePath),
+            theme: "vs-dark",
+            automaticLayout: true,
+            minimap: { enabled: false },
+            lineNumbers: "on",
+            folding: true,
+            bracketPairColorization: { enabled: true },
+            autoClosingBrackets: "always",
+            autoClosingQuotes: "always",
+            tabCompletion: "on",
+            smoothScrolling: true,
+            fontSize: 14,
+            padding: { top: 14, bottom: 14 },
+            scrollbar: {
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10
+            }
+        });
+
+        syncManifest();
+        refreshExplorer();
+    });
+
+    $("downloadButton").addEventListener("click", async () => {
+        if (!editor) {
+            showStatus("The code editor is still loading. Please try again.", true);
+            return;
+        }
+
+        const version = parseVersion($("addonVersion").value);
+        if (!version) {
+            showStatus("Version must use the format major.minor.patch, such as 1.0.0.", true);
+            return;
+        }
+
+        syncManifest();
+
+        for (const path of Object.keys(files)) {
+            if (!path.endsWith(".json")) continue;
+
+            try {
+                JSON.parse(files[path]);
+            } catch (error) {
+                openFile(path);
+                showStatus(`Invalid JSON in ${path}: ${error.message}`, true);
+                return;
+            }
+        }
+
+        const button = $("downloadButton");
+        button.disabled = true;
+        showStatus("Generating your addon package...");
+
+        try {
+            const icon = $("iconUpload").files[0] || await createFallbackIcon();
+            const zip = new JSZip();
+
+            for (const [path, content] of Object.entries(files)) {
+                zip.file(path, content);
+            }
+
+            zip.file("pack_icon.png", icon);
+
+            const archive = await zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 6 }
+            });
+
+            const url = URL.createObjectURL(archive);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${safeFilename($("addonName").value)}.mcaddon`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showStatus("Addon generated successfully. Your download should begin automatically.");
+        } catch (error) {
+            console.error(error);
+            showStatus("Unable to generate the addon. Please check the browser console.", true);
+        } finally {
+            button.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>
